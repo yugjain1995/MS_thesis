@@ -1,0 +1,81 @@
+dimensions
+  num_states = 2
+  Ns = 20
+end
+
+parameters
+  A (num_states,num_states) {1,1 1,2 2,2} # Input of Simulink S-function block - 3 elements
+  Bd (num_states,1) # Input of Simulink S-function block - 2 elements
+  Bd_bar (num_states,1) {1,1} # Input of Simulink S-function block - 2 elements
+  x[0] (num_states,1) # Input of Simulink S-function block - 2 elements
+  u0 (1) # Input of Simulink S-function block - 1 element
+  w[t] (1), t=0..Ns-1 # Input of Simulink S-function block - 20 elements
+  m1 (1) # Input of Simulink S-function block - 1 element
+  c1 (1) # Input of Simulink S-function block - 1 element
+  m2 (1) # Input of Simulink S-function block - 1 element
+  c2 (1) # Input of Simulink S-function block - 1 element
+  Cv (1,4) # Input of Simulink S-function block - 1 element
+  Ca (1,4) # Input of Simulink S-function block - 1 element
+  b (1,4) # Input of Simulink S-function block - 1 element
+  v_set (1) # Input of Simulink S-function block - 1 element
+  
+  a_max (1) # Parameter of Simulink S-function block - 1 element
+  a_min (1) # Parameter of Simulink S-function block - 1 element
+  del_a_max (1) # Parameter of Simulink S-function block - 1 element
+  del_a_min (1) # Parameter of Simulink S-function block - 1 element
+  del_d_max (1) # Parameter of Simulink S-function block - 1 element
+  del_d_min (1) # Parameter of Simulink S-function block - 1 element
+  A1 (1,num_states) {1,1} # [1 0] 
+  A2 (1,num_states) {1,2} # [0 1]  
+  
+end
+
+variables
+  x[t] (num_states,1), t=1..Ns
+  u[t] (1), t=0..Ns-1
+  q[t] (1), t=0..Ns-1
+  beta2[t] (1), t=0..Ns-1
+  gama1[t] (1), t=1..Ns
+  gama2[t] (1), t=1..Ns
+end
+
+minimize
+  sum[t=0..Ns-1](25*square(q[t]) + 4*beta2[t] + 5*gama1[t+1] + 5*gama2[t+1])
+subject to
+  # Dynamic constraint
+  x[t+1] == A*x[t] + Bd*u[t] + Bd_bar*w[t], t=0..Ns-1
+  
+  # Accleration limit
+  u[0] - m1*A2*x[0] - c1 <= 0
+  u[t] - m1*A2*x[t] - c1 <= 0, t=1..Ns-1
+  
+  u[0] - m2*A2*x[0] - c2 <= 0
+  u[t] - m2*A2*x[t] - c2 <= 0, t=1..Ns-1
+  
+  u[t] >= a_min, t=0..Ns-1
+  u[t] <= a_max, t=0..Ns-1
+  
+  # Acceleration change limit
+  u[0]-u0 <= del_a_max 
+  u[0]-u0 >= del_a_min - beta2[0]
+  u[t]-u[t-1] <= del_a_max, t=1..Ns-1
+  u[t]-u[t-1] >= del_a_min - beta2[t], t=1..Ns-1
+  beta2[t] >= 0,  t=0..Ns-1 # Slack variable is positive constraint 
+  
+  # Distance error limit
+  A1*x[t] <= del_d_max + gama1[t], t=1..Ns
+  A1*x[t] >= del_d_min - gama2[t], t=1..Ns
+  gama1[t] >= 0, t=1..Ns
+  gama2[t] >= 0, t=1..Ns
+  
+  # Velocity limit
+  A2*x[t] <= v_set, t=1..Ns
+  
+  # Fuel map approximation constraint
+  q[t] >= Cv[1]*A2*x[t] + Ca[1]*u[t] + b[1], t=0..Ns-1  
+  q[t] >= Cv[2]*A2*x[t] + Ca[2]*u[t] + b[2], t=0..Ns-1 
+  q[t] >= Cv[3]*A2*x[t] + Ca[3]*u[t] + b[3], t=0..Ns-1 
+  q[t] >= Cv[4]*A2*x[t] + Ca[4]*u[t] + b[4], t=0..Ns-1
+  #q[t] >= 0, t=0..Ns-1
+end
+​
